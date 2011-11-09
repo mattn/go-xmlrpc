@@ -14,7 +14,7 @@ func main() {
 		"password",
 		10)
 	if e != nil {
-		panic(e.String())
+		fmt.Println(e)
 	}
 	for _, p := range res.(xmlrpc.Array) {
 		for k, v := range p.(xmlrpc.Struct) {

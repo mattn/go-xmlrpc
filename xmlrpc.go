@@ -3,13 +3,13 @@ package xmlrpc
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/xml"
+	"errors"
 	"fmt"
-	"http"
-	"os"
+	"net/http"
 	"reflect"
 	"strconv"
 	"time"
-	"xml"
 )
 
 type Array []interface{}
@@ -41,7 +41,7 @@ type valueNode struct {
 	Body string `xml:"chardata"`
 }
 
-func next(p *xml.Parser) (xml.Name, interface{}, os.Error) {
+func next(p *xml.Parser) (xml.Name, interface{}, error) {
 	se, e := nextStart(p)
 	if e != nil {
 		return xml.Name{}, nil, e
@@ -105,7 +105,7 @@ func next(p *xml.Parser) (xml.Name, interface{}, os.Error) {
 			// name
 			se, e = nextStart(p)
 			if se.Name.Local != "name" {
-				return xml.Name{}, nil, os.NewError("invalid response")
+				return xml.Name{}, nil, errors.New("invalid response")
 			}
 			if e != nil {
 				break
@@ -122,7 +122,7 @@ func next(p *xml.Parser) (xml.Name, interface{}, os.Error) {
 			// value
 			_, value, e := next(p)
 			if se.Name.Local != "value" {
-				return xml.Name{}, nil, os.NewError("invalid response")
+				return xml.Name{}, nil, errors.New("invalid response")
 			}
 			if e != nil {
 				break
@@ -154,7 +154,7 @@ func next(p *xml.Parser) (xml.Name, interface{}, os.Error) {
 	}
 	return se.Name, nv, e
 }
-func nextStart(p *xml.Parser) (xml.StartElement, os.Error) {
+func nextStart(p *xml.Parser) (xml.StartElement, error) {
 	for {
 		t, e := p.Token()
 		if e != nil {
@@ -247,7 +247,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 	return
 }
 
-func Call(url, name string, args ...interface{}) (v interface{}, e os.Error) {
+func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	s := "<methodCall>"
 	s += "<methodName>" + xmlEscape(name) + "</methodName>"
 	s += "<params>"
@@ -267,19 +267,19 @@ func Call(url, name string, args ...interface{}) (v interface{}, e os.Error) {
 	p := xml.NewParser(r.Body)
 	se, e := nextStart(p) // methodResponse
 	if se.Name.Local != "methodResponse" {
-		return nil, os.NewError("invalid response")
+		return nil, errors.New("invalid response")
 	}
 	se, e = nextStart(p) // params
 	if se.Name.Local != "params" {
-		return nil, os.NewError("invalid response")
+		return nil, errors.New("invalid response")
 	}
 	se, e = nextStart(p) // param
 	if se.Name.Local != "param" {
-		return nil, os.NewError("invalid response")
+		return nil, errors.New("invalid response")
 	}
 	se, e = nextStart(p) // value
 	if se.Name.Local != "value" {
-		return nil, os.NewError("invalid response")
+		return nil, errors.New("invalid response")
 	}
 	_, v, e = next(p)
 	return v, e

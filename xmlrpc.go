@@ -59,13 +59,13 @@ func next(p *xml.Parser) (xml.Name, interface{}, error) {
 		if e = p.Unmarshal(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		i, e := strconv.Atoi64(vn.Body)
+		i, e := strconv.ParseInt(vn.Body, 10, 64)
 		return xml.Name{}, i, e
 	case "double":
 		if e = p.Unmarshal(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		f, e := strconv.Atof64(vn.Body)
+		f, e := strconv.ParseFloat(vn.Body, 64)
 		return xml.Name{}, f, e
 	case "dateTime.iso8601":
 		if e = p.Unmarshal(&vn, &se); e != nil {

@@ -41,7 +41,7 @@ type valueNode struct {
 	Body string `xml:"chardata"`
 }
 
-func next(p *xml.Parser) (xml.Name, interface{}, error) {
+func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 	se, e := nextStart(p)
 	if e != nil {
 		return xml.Name{}, nil, e
@@ -51,24 +51,24 @@ func next(p *xml.Parser) (xml.Name, interface{}, error) {
 	var vn valueNode
 	switch se.Name.Local {
 	case "string":
-		if e = p.Unmarshal(&vn, &se); e != nil {
+		if e = p.DecodeElement(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		return xml.Name{}, vn.Body, nil
 	case "int", "i4":
-		if e = p.Unmarshal(&vn, &se); e != nil {
+		if e = p.DecodeElement(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		i, e := strconv.ParseInt(vn.Body, 10, 64)
 		return xml.Name{}, i, e
 	case "double":
-		if e = p.Unmarshal(&vn, &se); e != nil {
+		if e = p.DecodeElement(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		f, e := strconv.ParseFloat(vn.Body, 64)
 		return xml.Name{}, f, e
 	case "dateTime.iso8601":
-		if e = p.Unmarshal(&vn, &se); e != nil {
+		if e = p.DecodeElement(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		t, e := time.Parse("20060102T15:04:05", vn.Body)
@@ -80,7 +80,7 @@ func next(p *xml.Parser) (xml.Name, interface{}, error) {
 		}
 		return xml.Name{}, t, e
 	case "base64":
-		if e = p.Unmarshal(&vn, &se); e != nil {
+		if e = p.DecodeElement(&vn, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		if b, e := base64.StdEncoding.DecodeString(vn.Body); e != nil {
@@ -110,7 +110,7 @@ func next(p *xml.Parser) (xml.Name, interface{}, error) {
 			if e != nil {
 				break
 			}
-			if e = p.Unmarshal(&vn, &se); e != nil {
+			if e = p.DecodeElement(&vn, &se); e != nil {
 				return xml.Name{}, nil, e
 			}
 			name := vn.Body
@@ -149,12 +149,12 @@ func next(p *xml.Parser) (xml.Name, interface{}, error) {
 		return xml.Name{}, ar, nil
 	}
 
-	if e = p.Unmarshal(nv, &se); e != nil {
+	if e = p.DecodeElement(nv, &se); e != nil {
 		return xml.Name{}, nil, e
 	}
 	return se.Name, nv, e
 }
-func nextStart(p *xml.Parser) (xml.StartElement, error) {
+func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 	for {
 		t, e := p.Token()
 		if e != nil {
@@ -264,7 +264,7 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	}
 	defer r.Body.Close()
 
-	p := xml.NewParser(r.Body)
+	p := xml.NewDecoder(r.Body)
 	se, e := nextStart(p) // methodResponse
 	if se.Name.Local != "methodResponse" {
 		return nil, errors.New("invalid response")

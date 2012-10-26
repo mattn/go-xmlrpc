@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strconv"
 	"time"
 )
 
@@ -48,42 +47,44 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 	}
 
 	var nv interface{}
-	var vn valueNode
 	switch se.Name.Local {
 	case "string":
-		if e = p.DecodeElement(&vn, &se); e != nil {
+		var s string
+		if e = p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		return xml.Name{}, vn.Body, nil
+		return xml.Name{}, s, nil
 	case "int", "i4":
-		if e = p.DecodeElement(&vn, &se); e != nil {
+		var i int
+		if e = p.DecodeElement(&i, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		i, e := strconv.ParseInt(vn.Body, 10, 64)
 		return xml.Name{}, i, e
 	case "double":
-		if e = p.DecodeElement(&vn, &se); e != nil {
+		var f float64
+		if e = p.DecodeElement(&f, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		f, e := strconv.ParseFloat(vn.Body, 64)
 		return xml.Name{}, f, e
 	case "dateTime.iso8601":
-		if e = p.DecodeElement(&vn, &se); e != nil {
+		var s string
+		if e = p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		t, e := time.Parse("20060102T15:04:05", vn.Body)
+		t, e := time.Parse("20060102T15:04:05", s)
 		if e != nil {
-			t, e = time.Parse("2006-01-02T15:04:05-07:00", vn.Body)
+			t, e = time.Parse("2006-01-02T15:04:05-07:00", s)
 			if e != nil {
-				t, e = time.Parse("2006-01-02T15:04:05", vn.Body)
+				t, e = time.Parse("2006-01-02T15:04:05", s)
 			}
 		}
 		return xml.Name{}, t, e
 	case "base64":
-		if e = p.DecodeElement(&vn, &se); e != nil {
+		var s string
+		if e = p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		if b, e := base64.StdEncoding.DecodeString(vn.Body); e != nil {
+		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
 			return xml.Name{}, nil, e
 		} else {
 			return xml.Name{}, b, nil
@@ -110,10 +111,10 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 			if e != nil {
 				break
 			}
-			if e = p.DecodeElement(&vn, &se); e != nil {
+			var name string
+			if e = p.DecodeElement(&name, &se); e != nil {
 				return xml.Name{}, nil, e
 			}
-			name := vn.Body
 			se, e = nextStart(p)
 			if e != nil {
 				break
@@ -138,8 +139,8 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 	case "array":
 		var ar Array
 		nextStart(p) // data
-		nextStart(p) // top of value
 		for {
+			nextStart(p) // top of value
 			_, value, e := next(p)
 			if e != nil {
 				break

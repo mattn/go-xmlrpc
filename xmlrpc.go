@@ -128,12 +128,12 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 			if e != nil {
 				break
 			}
+			st[name] = value
+
 			se, e = nextStart(p)
 			if e != nil {
 				break
 			}
-
-			st[name] = value
 		}
 		return xml.Name{}, st, nil
 	case "array":
@@ -223,6 +223,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 			s += "<value>" + to_xml(r.MapIndex(key).Interface(), typ) + "</value>"
 			s += "</member>"
 		}
+		s += "</struct>"
 		return s
 	case reflect.Ptr:
 		panic("unsupported type")
@@ -254,7 +255,7 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	s += "<params>"
 	for _, arg := range args {
 		s += "<param><value>"
-		s += to_xml(arg, false)
+		s += to_xml(arg, true)
 		s += "</value></param>"
 	}
 	s += "</params></methodCall>"

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -54,17 +56,37 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 			return xml.Name{}, nil, e
 		}
 		return xml.Name{}, s, nil
-	case "int", "i4":
-		var i int
-		if e = p.DecodeElement(&i, &se); e != nil {
+	case "boolean":
+		var s string
+		if e = p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
+		s = strings.TrimSpace(s)
+		var b bool
+		switch s {
+		case "true":
+			b = true
+		case "false":
+			b = false
+		default:
+			e = errors.New("invalid boolean value")
+		}
+		return xml.Name{}, b, e
+	case "int", "i1", "i2", "i4", "i8":
+		var s string
+		var i int
+		if e = p.DecodeElement(&s, &se); e != nil {
+			return xml.Name{}, nil, e
+		}
+		i, e = strconv.Atoi(strings.TrimSpace(s))
 		return xml.Name{}, i, e
 	case "double":
+		var s string
 		var f float64
-		if e = p.DecodeElement(&f, &se); e != nil {
+		if e = p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
+		f, e = strconv.ParseFloat(strings.TrimSpace(s), 64)
 		return xml.Name{}, f, e
 	case "dateTime.iso8601":
 		var s string

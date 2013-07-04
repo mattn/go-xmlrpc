@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/mattn/go-xmlrpc"
 	"fmt"
+	"log"
 )
 
 func main() {
@@ -14,7 +15,7 @@ func main() {
 		"password",
 		10)
 	if e != nil {
-		fmt.Println(e)
+		log.Fatal(e)
 	}
 	for _, p := range res.(xmlrpc.Array) {
 		for k, v := range p.(xmlrpc.Struct) {

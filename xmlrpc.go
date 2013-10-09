@@ -197,7 +197,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 	k := t.Kind()
 
 	if b, ok := v.([]byte); ok {
-		return base64.StdEncoding.EncodeToString(b)
+		return "<base64>" + base64.StdEncoding.EncodeToString(b) + "</base64>"
 	}
 
 	switch k {

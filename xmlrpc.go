@@ -264,6 +264,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 			s += "<value>" + to_xml(r.FieldByIndex([]int{n}).Interface(), true) + "</value>"
 			s += "</member>"
 		}
+		s += "</struct>"
 		return s
 	case reflect.UnsafePointer:
 		return to_xml(r.Elem(), typ)

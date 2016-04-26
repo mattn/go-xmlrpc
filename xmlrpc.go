@@ -64,9 +64,9 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		s = strings.TrimSpace(s)
 		var b bool
 		switch s {
-		case "true":
+		case "true","1":
 			b = true
-		case "false":
+		case "false","0":
 			b = false
 		default:
 			e = errors.New("invalid boolean value")

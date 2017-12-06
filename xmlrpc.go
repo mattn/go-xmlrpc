@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -287,6 +289,9 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	if e != nil {
 		return nil, e
 	}
+	// Since we do not always read the entire body, discard the rest, which
+	// allows the http transport to reuse the connection.
+	defer io.Copy(ioutil.Discard, r.Body)
 	defer r.Body.Close()
 
 	p := xml.NewDecoder(r.Body)

@@ -172,6 +172,8 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 			ar = append(ar, value)
 		}
 		return xml.Name{}, ar, nil
+	case "nil":
+		return xml.Name{}, nil, nil
 	}
 
 	if e = p.DecodeElement(nv, &se); e != nil {
@@ -194,6 +196,9 @@ func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 }
 
 func toXml(v interface{}, typ bool) (s string) {
+	if v == nil {
+		return "<nil/>"
+	}
 	r := reflect.ValueOf(v)
 	t := r.Type()
 	k := t.Kind()

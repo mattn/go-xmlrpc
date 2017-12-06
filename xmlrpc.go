@@ -274,10 +274,12 @@ func toXml(v interface{}, typ bool) (s string) {
 	return
 }
 
+// Client is client of XMLRPC
 type Client struct {
 	HttpClient *http.Client
 }
 
+// NewClient create new Client
 func NewClient() *Client {
 	return &Client{
 		HttpClient: &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second},
@@ -303,32 +305,38 @@ func call(client *http.Client, url, name string, args ...interface{}) (v interfa
 	if e != nil {
 		return nil, e
 	}
+
 	// Since we do not always read the entire body, discard the rest, which
 	// allows the http transport to reuse the connection.
 	defer io.Copy(ioutil.Discard, r.Body)
 	defer r.Body.Close()
 
+	if r.StatusCode/100 != 2 {
+		return nil, errors.New(http.StatusText(http.StatusBadRequest))
+	}
+
 	p := xml.NewDecoder(r.Body)
 	se, e := nextStart(p) // methodResponse
 	if se.Name.Local != "methodResponse" {
-		return nil, errors.New("invalid response")
+		return nil, errors.New("invalid response: missing methodResponse")
 	}
 	se, e = nextStart(p) // params
 	if se.Name.Local != "params" {
-		return nil, errors.New("invalid response")
+		return nil, errors.New("invalid response: missing params")
 	}
 	se, e = nextStart(p) // param
 	if se.Name.Local != "param" {
-		return nil, errors.New("invalid response")
+		return nil, errors.New("invalid response: missing param")
 	}
 	se, e = nextStart(p) // value
 	if se.Name.Local != "value" {
-		return nil, errors.New("invalid response")
+		return nil, errors.New("invalid response: missing value")
 	}
 	_, v, e = next(p)
 	return v, e
 }
 
+// Call call remote procedures function name with args
 func (c *Client) Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	return call(c.HttpClient, url, name, args...)
 }
@@ -337,6 +345,7 @@ func (c *Client) Call(url, name string, args ...interface{}) (v interface{}, e e
 // re-create transports for each request.
 var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
 
+// Call call remote procedures function name with args
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	return call(httpClient, url, name, args...)
 }

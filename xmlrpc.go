@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -64,9 +66,9 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		s = strings.TrimSpace(s)
 		var b bool
 		switch s {
-		case "true","1":
+		case "true", "1":
 			b = true
-		case "false","0":
+		case "false", "0":
 			b = false
 		default:
 			e = errors.New("invalid boolean value")
@@ -272,8 +274,12 @@ func to_xml(v interface{}, typ bool) (s string) {
 	return
 }
 
+// Global httpClient allows us to pool/reuse connections and not wastefully
+// re-create transports for each request.
+var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
+
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	s := "<methodCall>"
+	s := `<?xml version="1.0"?><methodCall>`
 	s += "<methodName>" + xmlEscape(name) + "</methodName>"
 	s += "<params>"
 	for _, arg := range args {
@@ -283,10 +289,14 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	}
 	s += "</params></methodCall>"
 	bs := bytes.NewBuffer([]byte(s))
-	r, e := http.Post(url, "text/xml", bs)
+
+	r, e := httpClient.Post(url, "text/xml", bs)
 	if e != nil {
 		return nil, e
 	}
+	// Since we do not always read the entire body, discard the rest, which
+	// allows the http transport to reuse the connection.
+	defer io.Copy(ioutil.Discard, r.Body)
 	defer r.Body.Close()
 
 	p := xml.NewDecoder(r.Body)

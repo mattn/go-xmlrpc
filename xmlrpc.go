@@ -193,7 +193,7 @@ func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 	panic("unreachable")
 }
 
-func to_xml(v interface{}, typ bool) (s string) {
+func toXml(v interface{}, typ bool) (s string) {
 	r := reflect.ValueOf(v)
 	t := r.Type()
 	k := t.Kind()
@@ -228,7 +228,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 		s = "<array><data>"
 		for n := 0; n < r.Len(); n++ {
 			s += "<value>"
-			s += to_xml(r.Index(n).Interface(), typ)
+			s += toXml(r.Index(n).Interface(), typ)
 			s += "</value>"
 		}
 		s += "</data></array>"
@@ -238,13 +238,13 @@ func to_xml(v interface{}, typ bool) (s string) {
 	case reflect.Func:
 		panic("unsupported type")
 	case reflect.Interface:
-		return to_xml(r.Elem(), typ)
+		return toXml(r.Elem(), typ)
 	case reflect.Map:
 		s = "<struct>"
 		for _, key := range r.MapKeys() {
 			s += "<member>"
 			s += "<name>" + xmlEscape(key.Interface().(string)) + "</name>"
-			s += "<value>" + to_xml(r.MapIndex(key).Interface(), typ) + "</value>"
+			s += "<value>" + toXml(r.MapIndex(key).Interface(), typ) + "</value>"
 			s += "</member>"
 		}
 		s += "</struct>"
@@ -263,59 +263,89 @@ func to_xml(v interface{}, typ bool) (s string) {
 		for n := 0; n < r.NumField(); n++ {
 			s += "<member>"
 			s += "<name>" + t.Field(n).Name + "</name>"
-			s += "<value>" + to_xml(r.FieldByIndex([]int{n}).Interface(), true) + "</value>"
+			s += "<value>" + toXml(r.FieldByIndex([]int{n}).Interface(), true) + "</value>"
 			s += "</member>"
 		}
 		s += "</struct>"
 		return s
 	case reflect.UnsafePointer:
-		return to_xml(r.Elem(), typ)
+		return toXml(r.Elem(), typ)
 	}
 	return
+}
+
+// Client is client of XMLRPC
+type Client struct {
+	HttpClient *http.Client
+}
+
+// NewClient create new Client
+func NewClient() *Client {
+	return &Client{
+		HttpClient: &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second},
+	}
+}
+
+func makeRequest(name string, args ...interface{}) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	buf.WriteString(`<?xml version="1.0"?><methodCall>`)
+	buf.WriteString("<methodName>" + xmlEscape(name) + "</methodName>")
+	buf.WriteString("<params>")
+	for _, arg := range args {
+		buf.WriteString("<param><value>")
+		buf.WriteString(toXml(arg, true))
+		buf.WriteString("</value></param>")
+	}
+	buf.WriteString("</params></methodCall>")
+	return buf
+}
+
+func call(client *http.Client, url, name string, args ...interface{}) (v interface{}, e error) {
+	r, e := httpClient.Post(url, "text/xml", makeRequest(name, args...))
+	if e != nil {
+		return nil, e
+	}
+
+	// Since we do not always read the entire body, discard the rest, which
+	// allows the http transport to reuse the connection.
+	defer io.Copy(ioutil.Discard, r.Body)
+	defer r.Body.Close()
+
+	if r.StatusCode/100 != 2 {
+		return nil, errors.New(http.StatusText(http.StatusBadRequest))
+	}
+
+	p := xml.NewDecoder(r.Body)
+	se, e := nextStart(p) // methodResponse
+	if se.Name.Local != "methodResponse" {
+		return nil, errors.New("invalid response: missing methodResponse")
+	}
+	se, e = nextStart(p) // params
+	if se.Name.Local != "params" {
+		return nil, errors.New("invalid response: missing params")
+	}
+	se, e = nextStart(p) // param
+	if se.Name.Local != "param" {
+		return nil, errors.New("invalid response: missing param")
+	}
+	se, e = nextStart(p) // value
+	if se.Name.Local != "value" {
+		return nil, errors.New("invalid response: missing value")
+	}
+	_, v, e = next(p)
+	return v, e
+}
+
+// Call call remote procedures function name with args
+func (c *Client) Call(url, name string, args ...interface{}) (v interface{}, e error) {
+	return call(c.HttpClient, url, name, args...)
 }
 
 // Global httpClient allows us to pool/reuse connections and not wastefully
 // re-create transports for each request.
 var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
 
+// Call call remote procedures function name with args
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	s := `<?xml version="1.0"?><methodCall>`
-	s += "<methodName>" + xmlEscape(name) + "</methodName>"
-	s += "<params>"
-	for _, arg := range args {
-		s += "<param><value>"
-		s += to_xml(arg, true)
-		s += "</value></param>"
-	}
-	s += "</params></methodCall>"
-	bs := bytes.NewBuffer([]byte(s))
-
-	r, e := httpClient.Post(url, "text/xml", bs)
-	if e != nil {
-		return nil, e
-	}
-	// Since we do not always read the entire body, discard the rest, which
-	// allows the http transport to reuse the connection.
-	defer io.Copy(ioutil.Discard, r.Body)
-	defer r.Body.Close()
-
-	p := xml.NewDecoder(r.Body)
-	se, e := nextStart(p) // methodResponse
-	if se.Name.Local != "methodResponse" {
-		return nil, errors.New("invalid response")
-	}
-	se, e = nextStart(p) // params
-	if se.Name.Local != "params" {
-		return nil, errors.New("invalid response")
-	}
-	se, e = nextStart(p) // param
-	if se.Name.Local != "param" {
-		return nil, errors.New("invalid response")
-	}
-	se, e = nextStart(p) // value
-	if se.Name.Local != "value" {
-		return nil, errors.New("invalid response")
-	}
-	_, v, e = next(p)
-	return v, e
+	return call(httpClient, url, name, args...)
 }

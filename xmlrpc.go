@@ -274,11 +274,17 @@ func to_xml(v interface{}, typ bool) (s string) {
 	return
 }
 
-// Global httpClient allows us to pool/reuse connections and not wastefully
-// re-create transports for each request.
-var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
+type Client struct {
+	HttpClient *http.Client
+}
 
-func Call(url, name string, args ...interface{}) (v interface{}, e error) {
+func NewClient() *Client {
+	return &Client{
+		HttpClient: &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second},
+	}
+}
+
+func call(client *http.Client, url, name string, args ...interface{}) (v interface{}, e error) {
 	s := `<?xml version="1.0"?><methodCall>`
 	s += "<methodName>" + xmlEscape(name) + "</methodName>"
 	s += "<params>"
@@ -318,4 +324,16 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	}
 	_, v, e = next(p)
 	return v, e
+}
+
+func (c *Client) Call(url, name string, args ...interface{}) (v interface{}, e error) {
+	return call(c.HttpClient, url, name, args...)
+}
+
+// Global httpClient allows us to pool/reuse connections and not wastefully
+// re-create transports for each request.
+var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
+
+func Call(url, name string, args ...interface{}) (v interface{}, e error) {
+	return call(httpClient, url, name, args...)
 }

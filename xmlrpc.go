@@ -66,9 +66,9 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		s = strings.TrimSpace(s)
 		var b bool
 		switch s {
-		case "true","1":
+		case "true", "1":
 			b = true
-		case "false","0":
+		case "false", "0":
 			b = false
 		default:
 			e = errors.New("invalid boolean value")
@@ -274,6 +274,10 @@ func to_xml(v interface{}, typ bool) (s string) {
 	return
 }
 
+// Global httpClient allows us to pool/reuse connections and not wastefully
+// re-create transports for each request.
+var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
+
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	s := `<?xml version="1.0"?><methodCall>`
 	s += "<methodName>" + xmlEscape(name) + "</methodName>"
@@ -285,7 +289,8 @@ func Call(url, name string, args ...interface{}) (v interface{}, e error) {
 	}
 	s += "</params></methodCall>"
 	bs := bytes.NewBuffer([]byte(s))
-	r, e := http.Post(url, "text/xml", bs)
+
+	r, e := httpClient.Post(url, "text/xml", bs)
 	if e != nil {
 		return nil, e
 	}

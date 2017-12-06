@@ -277,12 +277,14 @@ func toXml(v interface{}, typ bool) (s string) {
 // Client is client of XMLRPC
 type Client struct {
 	HttpClient *http.Client
+	url        string
 }
 
 // NewClient create new Client
-func NewClient() *Client {
+func NewClient(url string) *Client {
 	return &Client{
 		HttpClient: &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second},
+		url:        url,
 	}
 }
 
@@ -337,8 +339,8 @@ func call(client *http.Client, url, name string, args ...interface{}) (v interfa
 }
 
 // Call call remote procedures function name with args
-func (c *Client) Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	return call(c.HttpClient, url, name, args...)
+func (c *Client) Call(name string, args ...interface{}) (v interface{}, e error) {
+	return call(c.HttpClient, c.url, name, args...)
 }
 
 // Global httpClient allows us to pool/reuse connections and not wastefully

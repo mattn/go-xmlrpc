@@ -91,8 +91,8 @@ func TestSimple(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := NewClient()
-	v, err := client.Call(ts.URL+"/api", "Add", 1, 2)
+	client := NewClient(ts.URL + "/api")
+	v, err := client.Call("Add", 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

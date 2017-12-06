@@ -275,7 +275,7 @@ func to_xml(v interface{}, typ bool) (s string) {
 }
 
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	s := "<methodCall>"
+	s := `<?xml version="1.0"?><methodCall>`
 	s += "<methodName>" + xmlEscape(name) + "</methodName>"
 	s += "<params>"
 	for _, arg := range args {

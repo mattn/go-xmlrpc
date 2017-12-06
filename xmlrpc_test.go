@@ -25,6 +25,15 @@ func TestSimple(t *testing.T) {
 			http.Error(w, "missing methodName", http.StatusBadRequest)
 			return
 		}
+		var s string
+		if e := p.DecodeElement(&s, &se); e != nil {
+			http.Error(w, "wrong function name", http.StatusBadRequest)
+			return
+		}
+		if s != "Add" {
+			http.Error(w, fmt.Sprintf("want function name %q but got %q", "Add", s), http.StatusBadRequest)
+			return
+		}
 		se, _ = nextStart(p) // params
 		if se.Name.Local != "params" {
 			http.Error(w, "missing params", http.StatusBadRequest)
@@ -83,7 +92,7 @@ func TestSimple(t *testing.T) {
 	defer ts.Close()
 
 	client := NewClient()
-	v, err := client.Call(ts.URL+"/api", "add", 1, 2)
+	v, err := client.Call(ts.URL+"/api", "Add", 1, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

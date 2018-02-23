@@ -18,49 +18,23 @@ import (
 type Array []interface{}
 type Struct map[string]interface{}
 
-var xmlSpecial = map[byte]string{
-	'<':  "&lt;",
-	'>':  "&gt;",
-	'"':  "&quot;",
-	'\'': "&apos;",
-	'&':  "&amp;",
-}
-
-func xmlEscape(s string) string {
-	var b bytes.Buffer
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if s, ok := xmlSpecial[c]; ok {
-			b.WriteString(s)
-		} else {
-			b.WriteByte(c)
-		}
-	}
-	return b.String()
-}
-
-type valueNode struct {
-	Type string `xml:"attr"`
-	Body string `xml:"chardata"`
-}
-
 func next(p *xml.Decoder) (xml.Name, interface{}, error) {
-	se, e := nextStart(p)
-	if e != nil {
-		return xml.Name{}, nil, e
+	se, nextErr := nextStart(p)
+	if nextErr != nil {
+		return xml.Name{}, nil, nextErr
 	}
 
 	var nv interface{}
 	switch se.Name.Local {
 	case "string":
 		var s string
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		return xml.Name{}, s, nil
 	case "boolean":
 		var s string
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		s = strings.TrimSpace(s)
@@ -71,28 +45,28 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		case "false", "0":
 			b = false
 		default:
-			e = errors.New("invalid boolean value")
+			return xml.Name{}, b, errors.New("invalid boolean value")
 		}
-		return xml.Name{}, b, e
+		return xml.Name{}, b, nil
 	case "int", "i1", "i2", "i4", "i8":
 		var s string
 		var i int
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		i, e = strconv.Atoi(strings.TrimSpace(s))
+		i, e := strconv.Atoi(strings.TrimSpace(s))
 		return xml.Name{}, i, e
 	case "double":
 		var s string
 		var f float64
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
-		f, e = strconv.ParseFloat(strings.TrimSpace(s), 64)
+		f, e := strconv.ParseFloat(strings.TrimSpace(s), 64)
 		return xml.Name{}, f, e
 	case "dateTime.iso8601":
 		var s string
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		t, e := time.Parse("20060102T15:04:05", s)
@@ -105,7 +79,7 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		return xml.Name{}, t, e
 	case "base64":
 		var s string
-		if e = p.DecodeElement(&s, &se); e != nil {
+		if e := p.DecodeElement(&s, &se); e != nil {
 			return xml.Name{}, nil, e
 		}
 		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
@@ -125,6 +99,7 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 	case "struct":
 		st := Struct{}
 
+		var e error
 		se, e = nextStart(p)
 		for e == nil && se.Name.Local == "member" {
 			// name
@@ -176,10 +151,10 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		return xml.Name{}, nil, nil
 	}
 
-	if e = p.DecodeElement(nv, &se); e != nil {
+	if e := p.DecodeElement(nv, &se); e != nil {
 		return xml.Name{}, nil, e
 	}
-	return se.Name, nv, e
+	return se.Name, nv, nil
 }
 func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 	for {
@@ -192,91 +167,116 @@ func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 			return t, nil
 		}
 	}
-	panic("unreachable")
 }
 
-func toXml(v interface{}, typ bool) (s string) {
+var UnsupportedType = errors.New("unsupported type")
+
+func writeXML(w io.Writer, v interface{}, typ bool) error {
 	if v == nil {
-		return "<nil/>"
+		_, err := io.WriteString(w, "<nil/>")
+		return err
 	}
 	r := reflect.ValueOf(v)
 	t := r.Type()
 	k := t.Kind()
 
 	if b, ok := v.([]byte); ok {
-		return "<base64>" + base64.StdEncoding.EncodeToString(b) + "</base64>"
+		io.WriteString(w, "<base64>")
+		_, err := base64.NewEncoder(base64.StdEncoding, w).Write(b)
+		io.WriteString(w, "</base64>")
+		return err
 	}
 
 	switch k {
 	case reflect.Invalid:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Bool:
-		return fmt.Sprintf("<boolean>%v</boolean>", v)
+		_, err := fmt.Fprintf(w, "<boolean>%v</boolean>", v)
+		return err
 	case reflect.Int,
 		reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint,
 		reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		if typ {
-			return fmt.Sprintf("<int>%v</int>", v)
+			_, err := fmt.Fprintf(w, "<int>%v</int>", v)
+			return err
 		}
-		return fmt.Sprintf("%v", v)
+		_, err := fmt.Fprintf(w, "%v", v)
+		return err
 	case reflect.Uintptr:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Float32, reflect.Float64:
 		if typ {
-			return fmt.Sprintf("<double>%v</double>", v)
+			_, err := fmt.Fprintf(w, "<double>%v</double>", v)
+			return err
 		}
-		return fmt.Sprintf("%v", v)
+		_, err := fmt.Fprintf(w, "%v", v)
+		return err
 	case reflect.Complex64, reflect.Complex128:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Array:
-		s = "<array><data>"
+		io.WriteString(w, "<array><data>")
 		for n := 0; n < r.Len(); n++ {
-			s += "<value>"
-			s += toXml(r.Index(n).Interface(), typ)
-			s += "</value>"
+			io.WriteString(w, "<value>")
+			err := writeXML(w, r.Index(n).Interface(), typ)
+			io.WriteString(w, "</value>")
+			if err != nil {
+				return err
+			}
 		}
-		s += "</data></array>"
-		return s
+		_, err := io.WriteString(w, "</data></array>")
+		return err
 	case reflect.Chan:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Func:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Interface:
-		return toXml(r.Elem(), typ)
+		return writeXML(w, r.Elem(), typ)
 	case reflect.Map:
-		s = "<struct>"
+		io.WriteString(w, "<struct>")
 		for _, key := range r.MapKeys() {
-			s += "<member>"
-			s += "<name>" + xmlEscape(key.Interface().(string)) + "</name>"
-			s += "<value>" + toXml(r.MapIndex(key).Interface(), typ) + "</value>"
-			s += "</member>"
+			io.WriteString(w, "<member><name>")
+			if err := xml.EscapeText(w, []byte(key.Interface().(string))); err != nil {
+				return err
+			}
+			io.WriteString(w, "</name><value>")
+			if err := writeXML(w, r.MapIndex(key).Interface(), typ); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, "</value></member>"); err != nil {
+				return err
+			}
 		}
-		s += "</struct>"
-		return s
+		_, err := io.WriteString(w, "</struct>")
+		return err
 	case reflect.Ptr:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.Slice:
-		panic("unsupported type")
+		return UnsupportedType
 	case reflect.String:
 		if typ {
-			return fmt.Sprintf("<string>%v</string>", xmlEscape(v.(string)))
+			io.WriteString(w, "<string>")
 		}
-		return xmlEscape(v.(string))
+		err := xml.EscapeText(w, []byte(v.(string)))
+		if typ {
+			io.WriteString(w, "</string>")
+		}
+		return err
 	case reflect.Struct:
-		s = "<struct>"
+		io.WriteString(w, "<struct>")
 		for n := 0; n < r.NumField(); n++ {
-			s += "<member>"
-			s += "<name>" + t.Field(n).Name + "</name>"
-			s += "<value>" + toXml(r.FieldByIndex([]int{n}).Interface(), true) + "</value>"
-			s += "</member>"
+			fmt.Fprintf(w, "<member><name>%s</name><value>", t.Field(n).Name)
+			if err := writeXML(w, r.FieldByIndex([]int{n}).Interface(), true); err != nil {
+				return err
+			}
+			io.WriteString(w, "</value></member>")
 		}
-		s += "</struct>"
-		return s
+		_, err := io.WriteString(w, "</struct>")
+		return err
 	case reflect.UnsafePointer:
-		return toXml(r.Elem(), typ)
+		return writeXML(w, r.Elem(), typ)
 	}
-	return
+	return nil
 }
 
 // Client is client of XMLRPC
@@ -296,11 +296,15 @@ func NewClient(url string) *Client {
 func makeRequest(name string, args ...interface{}) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	buf.WriteString(`<?xml version="1.0"?><methodCall>`)
-	buf.WriteString("<methodName>" + xmlEscape(name) + "</methodName>")
+	buf.WriteString("<methodName>")
+	xml.EscapeText(buf, []byte(name))
+	buf.WriteString("</methodName>")
 	buf.WriteString("<params>")
 	for _, arg := range args {
 		buf.WriteString("<param><value>")
-		buf.WriteString(toXml(arg, true))
+		if err := writeXML(buf, arg, true); err != nil {
+			panic(err)
+		}
 		buf.WriteString("</value></param>")
 	}
 	buf.WriteString("</params></methodCall>")

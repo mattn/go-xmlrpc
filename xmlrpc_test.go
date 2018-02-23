@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -145,4 +146,12 @@ func TestAddString(t *testing.T) {
 	if s != "helloworld" {
 		t.Fatalf("want %q but got %q", "helloworld", v)
 	}
+}
+
+func toXml(v interface{}, typ bool) (s string) {
+	var buf strings.Builder
+	if err := writeXML(&buf, v, typ); err != nil {
+		panic(err)
+	}
+	return buf.String()
 }

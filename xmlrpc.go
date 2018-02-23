@@ -90,12 +90,11 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 	case "member":
 		nextStart(p)
 		return next(p)
-	case "value":
+
+	case "value", "name", "param":
 		nextStart(p)
 		return next(p)
-	case "name":
-		nextStart(p)
-		return next(p)
+
 	case "struct":
 		st := Struct{}
 
@@ -134,7 +133,8 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 				break
 			}
 		}
-		return xml.Name{}, st, nil
+		return xml.Name{}, st, e
+
 	case "array":
 		var ar Array
 		nextStart(p) // data
@@ -147,11 +147,37 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 			ar = append(ar, value)
 		}
 		return xml.Name{}, ar, nil
+
 	case "nil":
 		return xml.Name{}, nil, nil
+
+	case "params":
+		var ar Array
+		for {
+			_, value, e := next(p)
+			if e != nil {
+				break
+			}
+			ar = append(ar, value)
+		}
+		return xml.Name{}, ar, nil
+
+	case "fault":
+		_, value, _ := next(p)
+		fs, ok := value.(Struct)
+		if !ok {
+			return xml.Name{}, value, fmt.Errorf("fault: wanted Struct, got %#v", value)
+		}
+		var f Fault
+		if s, ok := fs["faultCode"].(string); ok {
+			f.Code, _ = strconv.Atoi(s)
+		}
+		f.Message, _ = fs["faultString"].(string)
+		return xml.Name{}, nil, &f
+
 	}
 
-	if e := p.DecodeElement(nv, &se); e != nil {
+	if e := p.DecodeElement(&nv, &se); e != nil {
 		return xml.Name{}, nil, e
 	}
 	return se.Name, nv, nil
@@ -293,26 +319,43 @@ func NewClient(url string) *Client {
 	}
 }
 
-func makeRequest(name string, args ...interface{}) *bytes.Buffer {
-	buf := new(bytes.Buffer)
-	buf.WriteString(`<?xml version="1.0"?><methodCall>`)
-	buf.WriteString("<methodName>")
-	xml.EscapeText(buf, []byte(name))
-	buf.WriteString("</methodName>")
-	buf.WriteString("<params>")
-	for _, arg := range args {
-		buf.WriteString("<param><value>")
-		if err := writeXML(buf, arg, true); err != nil {
-			panic(err)
+func Marshal(w io.Writer, name string, args ...interface{}) error {
+	io.WriteString(w, `<?xml version="1.0"?>`)
+	var end string
+	if name == "" {
+		io.WriteString(w, "<methodResponse>")
+		end = "</methodResponse>"
+	} else {
+		io.WriteString(w, "<methodCall><methodName>")
+		if err := xml.EscapeText(w, []byte(name)); err != nil {
+			return err
 		}
-		buf.WriteString("</value></param>")
+		io.WriteString(w, "</methodName>")
+		end = "</methodCall>"
 	}
-	buf.WriteString("</params></methodCall>")
-	return buf
+
+	io.WriteString(w, "<params>")
+	for _, arg := range args {
+		io.WriteString(w, "<param><value>")
+		if err := writeXML(w, arg, true); err != nil {
+			return err
+		}
+		io.WriteString(w, "</value></param>")
+	}
+	io.WriteString(w, "</params>")
+	_, err := io.WriteString(w, end)
+	return err
 }
 
-func call(client *http.Client, url, name string, args ...interface{}) (v interface{}, e error) {
-	r, e := httpClient.Post(url, "text/xml", makeRequest(name, args...))
+func makeRequest(name string, args ...interface{}) *bytes.Buffer {
+	var buf bytes.Buffer
+	if err := Marshal(&buf, name, args...); err != nil {
+		panic(err)
+	}
+	return &buf
+}
+func call(client *http.Client, url, name string, args ...interface{}) (v Array, e error) {
+	r, e := http.DefaultClient.Post(url, "text/xml", makeRequest(name, args...))
 	if e != nil {
 		return nil, e
 	}
@@ -326,37 +369,53 @@ func call(client *http.Client, url, name string, args ...interface{}) (v interfa
 		return nil, errors.New(http.StatusText(http.StatusBadRequest))
 	}
 
-	p := xml.NewDecoder(r.Body)
-	se, e := nextStart(p) // methodResponse
-	if se.Name.Local != "methodResponse" {
-		return nil, errors.New("invalid response: missing methodResponse")
-	}
-	se, e = nextStart(p) // params
-	if se.Name.Local != "params" {
-		return nil, errors.New("invalid response: missing params")
-	}
-	se, e = nextStart(p) // param
-	if se.Name.Local != "param" {
-		return nil, errors.New("invalid response: missing param")
-	}
-	se, e = nextStart(p) // value
-	if se.Name.Local != "value" {
-		return nil, errors.New("invalid response: missing value")
-	}
-	_, v, e = next(p)
+	_, v, e = Unmarshal(r.Body)
 	return v, e
 }
 
+func Unmarshal(r io.Reader) (string, Array, error) {
+	var name string
+	p := xml.NewDecoder(r)
+	se, e := nextStart(p) // methodResponse
+	if e != nil {
+		return name, nil, e
+	}
+	if se.Name.Local != "methodResponse" {
+		if se.Name.Local != "methodCall" {
+			return name, nil, errors.New("invalid response: missing methodResponse")
+		}
+		if se, e = nextStart(p); e != nil {
+			return name, nil, e
+		}
+		if se.Name.Local != "methodName" {
+			return name, nil, errors.New("invalid response: missing methodName")
+		}
+		if e = p.DecodeElement(&name, &se); e != nil {
+			return name, nil, e
+		}
+	}
+	_, v, e := next(p)
+	if a, ok := v.(Array); ok {
+		return name, a, e
+	} else if e == nil {
+		e = fmt.Errorf("wanted Array, got %#v", v)
+	}
+	return name, nil, e
+}
+
+type Fault struct {
+	Code    int
+	Message string
+}
+
+func (f *Fault) Error() string { return fmt.Sprintf("%d: %s", f.Code, f.Message) }
+
 // Call call remote procedures function name with args
-func (c *Client) Call(name string, args ...interface{}) (v interface{}, e error) {
+func (c *Client) Call(name string, args ...interface{}) (v Array, e error) {
 	return call(c.HttpClient, c.url, name, args...)
 }
 
-// Global httpClient allows us to pool/reuse connections and not wastefully
-// re-create transports for each request.
-var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
-
 // Call call remote procedures function name with args
-func Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	return call(httpClient, url, name, args...)
+func Call(url, name string, args ...interface{}) (v Array, e error) {
+	return call(http.DefaultClient, url, name, args...)
 }

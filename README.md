@@ -8,7 +8,7 @@ xmlrpc interface for go
 package main
 
 import (
-	"github.com/tgulacsi/go-xmlrpc"
+	"github.com/mattn/go-xmlrpc"
 	"fmt"
 	"log"
 )
@@ -38,7 +38,7 @@ func main() {
 ## Installation
 
 ```
-$ go get github.com/tgulacsi/go-xmlrpc
+$ go get github.com/mattn/go-xmlrpc
 ```
 
 ## License
@@ -48,4 +48,3 @@ MIT
 ## Author
 
 Yasuhiro Matsumoto (a.k.a. mattn)
-Tamás Gulácsi (tgulacsi)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -105,12 +106,12 @@ func TestAddInt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i, ok := v.(int)
+	i, ok := v[0].(int)
 	if !ok {
-		t.Fatalf("want int but got %T: %v", v, v)
+		t.Fatalf("want int but got %#v", v)
 	}
 	if i != 3 {
-		t.Fatalf("want %v but got %v", 3, v)
+		t.Fatalf("want %v but got %#v", 3, v)
 	}
 }
 
@@ -138,11 +139,19 @@ func TestAddString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, ok := v.(string)
+	s, ok := v[0].(string)
 	if !ok {
-		t.Fatalf("want string but got %T: %v", v, v)
+		t.Fatalf("want string but got %#v", v)
 	}
 	if s != "helloworld" {
 		t.Fatalf("want %q but got %q", "helloworld", v)
 	}
+}
+
+func toXml(v interface{}, typ bool) (s string) {
+	var buf strings.Builder
+	if err := writeXML(&buf, v, typ); err != nil {
+		panic(err)
+	}
+	return buf.String()
 }

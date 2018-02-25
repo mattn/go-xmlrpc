@@ -14,17 +14,19 @@ import (
 )
 
 func main() {
-	res, e := xmlrpc.Call(
+	res, e := xmlrpc.NewClient(
 		"http://your-blog.example.com/xmlrpc.php",
+	).Call(
 		"metaWeblog.getRecentPosts",
 		"blog-id",
 		"user-id",
 		"password",
-		10)
+		10,
+	)
 	if e != nil {
 		log.Fatal(e)
 	}
-	for _, p := range res.(xmlrpc.Array) {
+	for _, p := range res {
 		for k, v := range p.(xmlrpc.Struct) {
 			fmt.Printf("%s=%v\n", k, v)
 		}

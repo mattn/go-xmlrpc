@@ -257,7 +257,14 @@ func toXml(v interface{}, typ bool) (s string) {
 	case reflect.Ptr:
 		panic("unsupported type")
 	case reflect.Slice:
-		panic("unsupported type")
+		s = "<array><data>"
+		for n := 0; n < r.Len(); n++ {
+			s += "<value>"
+			s += toXml(r.Index(n).Interface(), typ)
+			s += "</value>"
+		}
+		s += "</data></array>"
+		return s
 	case reflect.String:
 		if typ {
 			return fmt.Sprintf("<string>%v</string>", xmlEscape(v.(string)))

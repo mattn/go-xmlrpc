@@ -146,3 +146,206 @@ func TestAddString(t *testing.T) {
 		t.Fatalf("want %q but got %q", "helloworld", v)
 	}
 }
+
+type ParseStructArrayHandler struct {
+}
+
+func (h *ParseStructArrayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(`
+<?xml version="1.0"?>
+<methodResponse>
+  <params>
+    <param>
+      <value>
+        <array>
+          <data>
+            <value>
+              <struct>
+                <member>
+                  <name>test1</name>
+                  <value>
+                    <string>a</string>
+                  </value>
+                </member>
+                <member>
+                  <name>test2</name>
+                  <value>
+                    <int>2</int>
+                  </value>
+                </member>
+              </struct>
+            </value>
+            <value>
+              <struct>
+                <member>
+                  <name>test1</name>
+                  <value>
+                    <string>b</string>
+                  </value>
+                </member>
+                <member>
+                  <name>test2</name>
+                  <value>
+                    <int>2</int>
+                  </value>
+                </member>
+              </struct>
+            </value>
+            <value>
+              <struct>
+                <member>
+                  <name>test1</name>
+                  <value>
+                    <string>c</string>
+                  </value>
+                </member>
+                <member>
+                  <name>test2</name>
+                  <value>
+                    <int>2</int>
+                  </value>
+                </member>
+              </struct>
+            </value>
+          </data>
+        </array>
+      </value>
+    </param>
+  </params>
+</methodResponse>
+		`))
+}
+
+func TestParseStructArray(t *testing.T) {
+	ts := httptest.NewServer(&ParseStructArrayHandler{})
+	defer ts.Close()
+
+	res, err := NewClient(ts.URL + "/").Call("Irrelevant")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.(Array)) != 3 {
+		t.Fatal("expected array with 3 entries")
+	}
+}
+
+type ParseIntArrayHandler struct {
+}
+
+func (h *ParseIntArrayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(`
+<?xml version="1.0"?>
+<methodResponse>
+  <params>
+    <param>
+      <value>
+        <array>
+          <data>
+            <value>
+              <int>2</int>
+            </value>
+            <value>
+              <int>3</int>
+            </value>
+            <value>
+              <int>4</int>
+            </value>
+          </data>
+        </array>
+      </value>
+    </param>
+  </params>
+</methodResponse>
+		`))
+}
+
+func TestParseIntArray(t *testing.T) {
+	ts := httptest.NewServer(&ParseIntArrayHandler{})
+	defer ts.Close()
+
+	res, err := NewClient(ts.URL + "/").Call("Irrelevant")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.(Array)) != 3 {
+		t.Fatal("expected array with 3 entries")
+	}
+}
+
+type ParseMixedArrayHandler struct {
+}
+
+func (h *ParseMixedArrayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(`
+<?xml version="1.0"?>
+<methodResponse>
+  <params>
+    <param>
+      <value>
+        <array>
+          <data>
+            <value>
+              <struct>
+                <member>
+                  <name>test1</name>
+                  <value>
+                    <string>a</string>
+                  </value>
+                </member>
+                <member>
+                  <name>test2</name>
+                  <value>
+                    <int>2</int>
+                  </value>
+                </member>
+              </struct>
+            </value>
+            <value>
+              <int>2</int>
+            </value>
+            <value>
+              <struct>
+                <member>
+                  <name>test1</name>
+                  <value>
+                    <string>b</string>
+                  </value>
+                </member>
+                <member>
+                  <name>test2</name>
+                  <value>
+                    <int>2</int>
+                  </value>
+                </member>
+              </struct>
+            </value>
+            <value>
+              <int>4</int>
+            </value>
+          </data>
+        </array>
+      </value>
+    </param>
+  </params>
+</methodResponse>
+		`))
+}
+
+func TestParseMixedArray(t *testing.T) {
+	ts := httptest.NewServer(&ParseMixedArrayHandler{})
+	defer ts.Close()
+
+	res, err := NewClient(ts.URL + "/").Call("Irrelevant")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.(Array)) != 4 {
+		t.Fatal("expected array with 4 entries")
+	}
+}

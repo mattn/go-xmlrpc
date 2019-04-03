@@ -15,16 +15,23 @@ import (
 	"time"
 )
 
+// Array is a generic array
 type Array []interface{}
+
+// Struct is a generic map
 type Struct map[string]interface{}
 
-var xmlSpecial = map[byte]string{
-	'<':  "&lt;",
-	'>':  "&gt;",
-	'"':  "&quot;",
-	'\'': "&apos;",
-	'&':  "&amp;",
-}
+var (
+	xmlSpecial = map[byte]string{
+		'<':  "&lt;",
+		'>':  "&gt;",
+		'"':  "&quot;",
+		'\'': "&apos;",
+		'&':  "&amp;",
+	}
+	errStartingTagNotFound = errors.New("starting tag expexted")
+	errEndingTagNotFound   = errors.New("ending tag expexted")
+)
 
 func xmlEscape(s string) string {
 	var b bytes.Buffer
@@ -39,29 +46,22 @@ func xmlEscape(s string) string {
 	return b.String()
 }
 
-type valueNode struct {
-	Type string `xml:"attr"`
-	Body string `xml:"chardata"`
-}
-
-func next(p *xml.Decoder) (xml.Name, interface{}, error) {
+func next(p *xml.Decoder) (interface{}, error) {
 	se, e := nextStart(p)
 	if e != nil {
-		return xml.Name{}, nil, e
+		return nil, e
 	}
-
-	var nv interface{}
 	switch se.Name.Local {
 	case "string":
 		var s string
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
-		return xml.Name{}, s, nil
+		return s, nil
 	case "boolean":
 		var s string
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
 		s = strings.TrimSpace(s)
 		var b bool
@@ -73,27 +73,27 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 		default:
 			e = errors.New("invalid boolean value")
 		}
-		return xml.Name{}, b, e
+		return b, e
 	case "int", "i1", "i2", "i4", "i8":
 		var s string
 		var i int
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
 		i, e = strconv.Atoi(strings.TrimSpace(s))
-		return xml.Name{}, i, e
+		return i, e
 	case "double":
 		var s string
 		var f float64
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
 		f, e = strconv.ParseFloat(strings.TrimSpace(s), 64)
-		return xml.Name{}, f, e
+		return f, e
 	case "dateTime.iso8601":
 		var s string
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
 		t, e := time.Parse("20060102T15:04:05", s)
 		if e != nil {
@@ -102,89 +102,123 @@ func next(p *xml.Decoder) (xml.Name, interface{}, error) {
 				t, e = time.Parse("2006-01-02T15:04:05", s)
 			}
 		}
-		return xml.Name{}, t, e
+		return t, e
 	case "base64":
 		var s string
 		if e = p.DecodeElement(&s, &se); e != nil {
-			return xml.Name{}, nil, e
+			return nil, e
 		}
-		if b, e := base64.StdEncoding.DecodeString(s); e != nil {
-			return xml.Name{}, nil, e
-		} else {
-			return xml.Name{}, b, nil
+		b, e := base64.StdEncoding.DecodeString(s)
+		if e != nil {
+			return nil, e
 		}
-	case "member":
-		nextStart(p)
-		return next(p)
-	case "value":
-		nextStart(p)
-		return next(p)
-	case "name":
-		nextStart(p)
-		return next(p)
+		return b, nil
 	case "struct":
 		st := Struct{}
 
-		se, e = nextStart(p)
-		for e == nil && se.Name.Local == "member" {
-			// name
-			se, e = nextStart(p)
-			if se.Name.Local != "name" {
-				return xml.Name{}, nil, errors.New("invalid response")
-			}
-			if e != nil {
+		for {
+			se, err := nextStart(p)
+			if err == errStartingTagNotFound { // end of struct
 				break
+			} else if err != nil {
+				return nil, err
+			} else if se.Name.Local != "member" {
+				return nil, errors.New("member element expected")
+			}
+			se, err = nextStart(p)
+			if err != nil {
+				return nil, err
+			} else if se.Name.Local != "name" {
+				return nil, errors.New("name element expected")
 			}
 			var name string
-			if e = p.DecodeElement(&name, &se); e != nil {
-				return xml.Name{}, nil, e
+			if e = p.DecodeElement(&name, &se); e != nil { // DecodeElement closes name element
+				return nil, e
 			}
-			se, e = nextStart(p)
-			if e != nil {
-				break
+			se, err = nextStart(p)
+			if err != nil {
+				return nil, err
+			} else if se.Name.Local != "value" {
+				return nil, errors.New("value element for member expected")
 			}
-
 			// value
-			_, value, e := next(p)
-			if se.Name.Local != "value" {
-				return xml.Name{}, nil, errors.New("invalid response")
-			}
+			value, e := next(p)
 			if e != nil {
-				break
+				return nil, e
+			}
+			err = nextEnd(p) // value end
+			if err != nil {
+				return nil, err
+			}
+			err = nextEnd(p) // member end
+			if err != nil {
+				return nil, err
 			}
 			st[name] = value
-
-			se, e = nextStart(p)
-			if e != nil {
-				break
-			}
 		}
-		return xml.Name{}, st, nil
+		return st, nil
 	case "array":
+		fmt.Println("reading array")
+		se, err := nextStart(p) // data
+		if err != nil {
+			return nil, err
+		} else if se.Name.Local != "data" {
+			return nil, errors.New("data element expected")
+		}
 		var ar Array
-		nextStart(p) // data
-		nextStart(p) // top of value
 		for {
-			_, value, e := next(p)
-			if e != nil {
+			se, err := nextStart(p)            // value
+			if err == errStartingTagNotFound { // end of array, end data reached
 				break
+			} else if err != nil {
+				return nil, err
+			} else if se.Name.Local != "value" {
+				return nil, errors.New("value element expected")
 			}
+			value, e := next(p)
+			if e != nil {
+				return nil, e
+			}
+			err = nextEnd(p) // closing value
+			if err != nil {
+				return nil, err
+			}
+
 			ar = append(ar, value)
 
-			if reflect.ValueOf(value).Kind() != reflect.Map {
-				nextStart(p)
-			}
 		}
-		return xml.Name{}, ar, nil
+		err = nextEnd(p) // closing array
+		if err != nil {
+			return nil, err
+		}
+		return ar, nil
 	case "nil":
-		return xml.Name{}, nil, nil
+		return nil, nil
+	default:
+		var nv interface{}
+		if e = p.DecodeElement(nv, &se); e != nil {
+			return nil, e
+		}
+		return nv, e
 	}
-
-	if e = p.DecodeElement(nv, &se); e != nil {
-		return xml.Name{}, nil, e
-	}
-	return se.Name, nv, e
 }
+
+// func nextStart(p *xml.Decoder) (xml.StartElement, error) {
+// 	for {
+// 		t, e := p.Token()
+// 		if e != nil {
+// 			return xml.StartElement{}, e
+// 		}
+// 		switch t := t.(type) {
+// 		case xml.StartElement:
+// 			fmt.Println("at ", t.Name.Local)
+// 			return t, nil
+// 		case xml.EndElement:
+// 			fmt.Println("closing ", t.Name.Local)
+// 		}
+// 	}
+// }
+
 func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 	for {
 		t, e := p.Token()
@@ -194,9 +228,25 @@ func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 		switch t := t.(type) {
 		case xml.StartElement:
 			return t, nil
+		case xml.EndElement:
+			return xml.StartElement{}, errStartingTagNotFound
 		}
 	}
-	panic("unreachable")
+}
+
+func nextEnd(p *xml.Decoder) error {
+	for {
+		t, e := p.Token()
+		if e != nil {
+			return e
+		}
+		switch t.(type) {
+		case xml.EndElement:
+			return nil
+		case xml.StartElement:
+			return errEndingTagNotFound
+		}
+	}
 }
 
 func toXml(v interface{}, typ bool) (s string) {
@@ -350,7 +400,7 @@ func call(client *http.Client, url, name string, args ...interface{}) (v interfa
 	if se.Name.Local != "value" {
 		return nil, errors.New("invalid response: missing value")
 	}
-	_, v, e = next(p)
+	v, e = next(p)
 	return v, e
 }
 

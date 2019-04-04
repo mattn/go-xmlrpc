@@ -55,7 +55,7 @@ func createServer(path, name string, f func(args ...interface{}) (interface{}, e
 				http.Error(w, "missing value", http.StatusBadRequest)
 				return
 			}
-			_, v, err := next(p)
+			v, err := next(p)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -347,5 +347,271 @@ func TestParseMixedArray(t *testing.T) {
 
 	if len(res.(Array)) != 4 {
 		t.Fatal("expected array with 4 entries")
+	}
+}
+
+type ParseNestedArray struct {
+}
+
+func (h *ParseNestedArray) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(`
+	<?xml version="1.0" encoding="UTF-8"?>
+	<methodResponse>
+	<params>
+	<param>
+	<value><array>
+	<data>
+	<value><array>
+	<data>
+	<value><array>
+	<data>
+	<value><struct>
+	<member><name>type</name>
+	<value><string>folder</string></value>
+	</member>
+	<member><name>folderid</name>
+	<value><string>QVlJS3ZXTjGu4lczs4ugVw</string></value>
+	</member>
+	<member><name>label</name>
+	<value><string>SEJOURS</string></value>
+	</member>
+	<member><name>modificationdate</name>
+	<value><double>0</double></value>
+	</member>
+	<member><name>createddate</name>
+	<value><double>1554311194000</double></value>
+	</member>
+	</struct></value>
+	<value><struct>
+	<member><name>type</name>
+	<value><string>folder</string></value>
+	</member>
+	<member><name>folderid</name>
+	<value><string>sdsd</string></value>
+	</member>
+	<member><name>label</name>
+	<value><string>ETE</string></value>
+	</member>
+	<member><name>modificationdate</name>
+	<value><double>0</double></value>
+	</member>
+	<member><name>createddate</name>
+	<value><double>1554221058000</double></value>
+	</member>
+	</struct></value>
+	</data>
+	</array></value>
+	</data>
+	</array></value>
+	<value><array>
+	<data>
+	<value><array>
+	<data>
+	<value><struct>
+	<member><name>albumid</name>
+	<value><string>QVlJS3ZXTjEpIPrMXDKLuw</string></value>
+	</member>
+	<member><name>label</name>
+	<value><string>PHOTOS</string></value>
+	</member>
+	<member><name>orderby</name>
+	<value><string>date</string></value>
+	</member>
+	<member><name>ordertype</name>
+	<value><string>ascending</string></value>
+	</member>
+	<member><name>date</name>
+	<value><double>1554221064000</double></value>
+	</member>
+	<member><name>createddate</name>
+	<value><double>1554221068000</double></value>
+	</member>
+	<member><name>lastvisitdate</name>
+	<value><double>1554221068000</double></value>
+	</member>
+	<member><name>lastfileaddeddate</name>
+	<value><double>0</double></value>
+	</member>
+	<member><name>public</name>
+	<value><int>0</int></value>
+	</member>
+	<member><name>allowdownload</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>allowupload</name>
+	<value><int>0</int></value>
+	</member>
+	<member><name>allowprintorder</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>allowsendcomments</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>folderid</name>
+	<value><string>zezeze</string></value>
+	</member>
+	</struct></value>
+	<value><struct>
+	<member><name>albumid</name>
+	<value><string>zeeze</string></value>
+	</member>
+	<member><name>label</name>
+	<value><string>test</string></value>
+	</member>
+	<member><name>orderby</name>
+	<value><string>date</string></value>
+	</member>
+	<member><name>ordertype</name>
+	<value><string>ascending</string></value>
+	</member>
+	<member><name>date</name>
+	<value><double>1554311214000</double></value>
+	</member>
+	<member><name>createddate</name>
+	<value><double>1554311217000</double></value>
+	</member>
+	<member><name>lastvisitdate</name>
+	<value><double>1554311241000</double></value>
+	</member>
+	<member><name>lastfileaddeddate</name>
+	<value><double>1554311238000</double></value>
+	</member>
+	<member><name>public</name>
+	<value><int>0</int></value>
+	</member>
+	<member><name>allowdownload</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>allowupload</name>
+	<value><int>0</int></value>
+	</member>
+	<member><name>allowprintorder</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>allowsendcomments</name>
+	<value><int>1</int></value>
+	</member>
+	<member><name>folderid</name>
+	<value><string>QVlJS3ZXTjGM3tkbWu_Z0A</string></value>
+	</member>
+	</struct></value>
+	</data>
+	</array></value>
+	</data>
+	</array></value>
+	<value><array>
+	<data>
+	<value><array>
+	<data>
+	<value><struct>
+	<member><name>contactid</name>
+	<value><string>QVlJS3ZXzeeeTjH9d-QUwXR5jg</string></value>
+	</member>
+	<member><name>login</name>
+	<value><string>benoit.zez</string></value>
+	</member>
+	<member><name>type</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>usePreferences</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>password</name>
+	<value><string>ddere</string></value>
+	</member>
+	<member><name>firstname</name>
+	<value><string></string></value>
+	</member>
+	<member><name>lastname</name>
+	<value><string></string></value>
+	</member>
+	<member><name>email</name>
+	<value><string>zelkzjez@test.fr</string></value>
+	</member>
+	<member><name>phoneNumber</name>
+	<value><string></string></value>
+	</member>
+	</struct></value>
+	<value><struct>
+	<member><name>contactid</name>
+	<value><string>zezez</string></value>
+	</member>
+	<member><name>login</name>
+	<value><string>zezezeze</string></value>
+	</member>
+	<member><name>type</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>usePreferences</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>password</name>
+	<value><string>dezzrere</string></value>
+	</member>
+	<member><name>firstname</name>
+	<value><string>a</string></value>
+	</member>
+	<member><name>lastname</name>
+	<value><string>a</string></value>
+	</member>
+	<member><name>email</name>
+	<value><string>xxxxx@gmail.com</string></value>
+	</member>
+	<member><name>phoneNumber</name>
+	<value><string></string></value>
+	</member>
+	</struct></value>
+	<value><struct>
+	<member><name>contactid</name>
+	<value><string>QVlJS3ZXTjddFSflbF5i2KMQ</string></value>
+	</member>
+	<member><name>login</name>
+	<value><string>eee</string></value>
+	</member>
+	<member><name>type</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>usePreferences</name>
+	<value><string>0</string></value>
+	</member>
+	<member><name>password</name>
+	<value><string>eeeee</string></value>
+	</member>
+	<member><name>firstname</name>
+	<value><string>Benoit</string></value>
+	</member>
+	<member><name>lastname</name>
+	<value><string>KUG</string></value>
+	</member>
+	<member><name>email</name>
+	<value><string>sderedr@free.fr</string></value>
+	</member>
+	<member><name>phoneNumber</name>
+	<value><string></string></value>
+	</member>
+	</struct></value>
+	</data>
+	</array></value>
+	</data>
+	</array></value>
+	</data>
+	</array></value>
+	</param>
+	</params>
+	</methodResponse>`))
+}
+
+func TestParseNestedArray(t *testing.T) {
+	ts := httptest.NewServer(&ParseNestedArray{})
+	defer ts.Close()
+
+	res, err := NewClient(ts.URL + "/").Call("Irrelevant")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.(Array)) != 3 {
+		t.Fatal("expected array with 3 entries")
 	}
 }

@@ -158,7 +158,6 @@ func next(p *xml.Decoder) (interface{}, error) {
 		}
 		return st, nil
 	case "array":
-		fmt.Println("reading array")
 		se, err := nextStart(p) // data
 		if err != nil {
 			return nil, err
@@ -202,22 +201,6 @@ func next(p *xml.Decoder) (interface{}, error) {
 		return nv, e
 	}
 }
-
-// func nextStart(p *xml.Decoder) (xml.StartElement, error) {
-// 	for {
-// 		t, e := p.Token()
-// 		if e != nil {
-// 			return xml.StartElement{}, e
-// 		}
-// 		switch t := t.(type) {
-// 		case xml.StartElement:
-// 			fmt.Println("at ", t.Name.Local)
-// 			return t, nil
-// 		case xml.EndElement:
-// 			fmt.Println("closing ", t.Name.Local)
-// 		}
-// 	}
-// }
 
 func nextStart(p *xml.Decoder) (xml.StartElement, error) {
 	for {

@@ -360,9 +360,11 @@ func (c *Client) Call(name string, args ...interface{}) (v interface{}, e error)
 	return call(c.HttpClient, c.url, name, args...)
 }
 
-// Global httpClient allows us to pool/reuse connections and not wastefully
-// re-create transports for each request.
+// Set this to true if you want to disable SSL verification
 var InsecureSkipVerify = false
+
+// Global HttpClient allows us to pool/reuse connections and not wastefully
+// re-create transports for each request.
 var HttpClient = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: InsecureSkipVerify}}, Timeout: 10 * time.Second}
 
 // Call call remote procedures function name with args

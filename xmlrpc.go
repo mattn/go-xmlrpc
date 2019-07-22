@@ -2,6 +2,7 @@ package xmlrpc
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
@@ -359,11 +360,14 @@ func (c *Client) Call(name string, args ...interface{}) (v interface{}, e error)
 	return call(c.HttpClient, c.url, name, args...)
 }
 
-// Global httpClient allows us to pool/reuse connections and not wastefully
+// Set this to true if you want to disable SSL verification
+var InsecureSkipVerify = false
+
+// Global HttpClient allows us to pool/reuse connections and not wastefully
 // re-create transports for each request.
-var httpClient = &http.Client{Transport: http.DefaultTransport, Timeout: 10 * time.Second}
+var HttpClient = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: InsecureSkipVerify}}, Timeout: 10 * time.Second}
 
 // Call call remote procedures function name with args
 func Call(url, name string, args ...interface{}) (v interface{}, e error) {
-	return call(httpClient, url, name, args...)
+	return call(HttpClient, url, name, args...)
 }

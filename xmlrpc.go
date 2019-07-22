@@ -2,6 +2,7 @@ package xmlrpc
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
